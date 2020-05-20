@@ -126,7 +126,30 @@ class QuestionDetailViewTests(TestCase):
         self.assertContains(response, past_question.question_text)
 
     def test_choices_exist(self):
-        pass
+        """
+        The detail view of a question should have choices
+        """
+        question = create_question(question_text="question", days=0)
+        question.choice_set.create(choice_text="choice A")
+        question.choice_set.create(choice_text="choice B")
+        url = reverse('polls:detail', args=(question.id,))
+        response = self.client.get(url)
+        self.assertTrue(response.context['question'].choice_set.all())
+        self.assertCountEqual(response.context['question'].choice_set.all(), 
+                              question.choice_set.all())
+        self.assertQuerysetEqual(response.context['question'].choice_set.all(), 
+                                 question.choice_set.all(), 
+                                 ordered=False, 
+                                 transform=lambda x: x)
+
+    def test_no_choices_exist(self):
+        """
+        The detail view of a question with no choices should redirect to index
+        """
+        question = create_question(question_text="question", days=0)
+        url = reverse('polls:detail', args=(question.id,))
+        response = self.client.get(url)
+        self.assertRedirects(response,reverse('polls:index'))
 
 class QuestionResultViewTests(TestCase):
     def test_future_question(self):
