@@ -37,14 +37,18 @@ class QuestionModelTests(TestCase):
         recent_question = Question(pub_date=time)
         self.assertIs(recent_question.was_published_recently(), True)
 
-def create_question(question_text, days):
+def create_question(question_text, days, choice=True):
     """
     Create a question with the given `question_text` and published the
     given number of `days` offset to now (negative for questions published
     in the past, positive for questions that have yet to be published).
+    Creates a choice by default, can override to have no choices.
     """
     time = timezone.now() + datetime.timedelta(days=days)
-    return Question.objects.create(question_text=question_text, pub_date=time)
+    question = Question.objects.create(question_text=question_text, pub_date=time)
+    if choice:
+        question.choice_set.create(choice_text="Choice A")
+    return question
 
 class QuestionIndexViewTests(TestCase):
     def test_no_questions(self):
@@ -61,7 +65,7 @@ class QuestionIndexViewTests(TestCase):
         Questions with a pub_date in the past are displayed on the
         index page.
         """
-        create_question(question_text="Past question.", days=-30)
+        question = create_question(question_text="Past question.", days=-30)
         response = self.client.get(reverse('polls:index'))
         self.assertQuerysetEqual(
             response.context['latest_question_list'],
@@ -130,8 +134,6 @@ class QuestionDetailViewTests(TestCase):
         The detail view of a question should have choices
         """
         question = create_question(question_text="question", days=0)
-        question.choice_set.create(choice_text="choice A")
-        question.choice_set.create(choice_text="choice B")
         url = reverse('polls:detail', args=(question.id,))
         response = self.client.get(url)
         self.assertTrue(response.context['question'].choice_set.all())
@@ -146,18 +148,37 @@ class QuestionDetailViewTests(TestCase):
         """
         The detail view of a question with no choices should redirect to index
         """
-        question = create_question(question_text="question", days=0)
+        question = create_question(question_text="question", days=0, choice=False)
         url = reverse('polls:detail', args=(question.id,))
         response = self.client.get(url)
-        self.assertRedirects(response,reverse('polls:index'))
+        self.assertEqual(response.status_code, 404)
+#        self.assertRedirects(response,reverse('polls:index'))
 
-class QuestionResultViewTests(TestCase):
+class QuestionResultViewTests(TestCase): # TODO Add tests with votes
     def test_future_question(self):
-        pass
+        """
+        The results view of a question with a pub_date in the future 
+        returns a 404 not found
+        """
+        future_question = create_question("Future question.", days=5)
+        url = reverse('polls:results', args=(future_question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
     def test_past_question(self):
-        pass
+        """
+        The result view of a question with a pub_date in the past 
+        displays the question's text.
+        """
+        past_question = create_question("Past question.", days=-5)
+        url = reverse('polls:results', args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, past_question.question_text)
     def test_negative_votes(self):
         pass
     def test_choices_exist(self):
-        pass
+        question = create_question(question_text="question", days=0, choice=False)
+        url = reverse('polls:results', args=(question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+#        self.assertRedirects(response,reverse('polls:index'))
     

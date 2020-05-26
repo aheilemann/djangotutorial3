@@ -1,5 +1,5 @@
-from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404, render, redirect
+from django.http import HttpResponseRedirect, Http404
 from django.urls import reverse
 from django.views import generic
 from django.db.models import F
@@ -29,17 +29,37 @@ class IndexView(generic.ListView):
 class DetailView(generic.DetailView):
     model = Question
     template_name = 'polls/detail.html'
+    queryset = Question.objects.filter(pub_date__lte=timezone.now())
     
-    def get_queryset(self):
+    def get_queryset(self): # override queryset
         """
         Excludes any questions that aren't published yet.
         """
-#        if Question.objects.choice_set.all
-        return Question.objects.filter(pub_date__lte=timezone.now())
+        question = get_object_or_404(Question, pk=self.kwargs.get("pk"))
+        choices = question.choice_set.all()
+        if choices:
+            return Question.objects.filter(pub_date__lte=timezone.now())
+        else: 
+            # This should redirect to index
+            raise Http404("Question is incomplete (has no choices)")
+        #return Question.objects.filter(pub_date__lte=timezone.now())
 
 class ResultsView(generic.DetailView):
     model = Question
     template_name = 'polls/results.html'
+
+    def get_queryset(self): # override queryset
+            """
+            Excludes any questions that aren't published yet.
+            """
+            question = get_object_or_404(Question, pk=self.kwargs.get("pk"))
+            choices = question.choice_set.all()
+            if choices:
+                return Question.objects.filter(pub_date__lte=timezone.now())
+            else: 
+                # This should redirect to index
+                raise Http404("Question is incomplete (has no choices)")
+            #return Question.objects.filter(pub_date__lte=timezone.now())
 
 def vote(request, question_id):
     question = get_object_or_404(Question, pk=question_id)
