@@ -1,5 +1,6 @@
 ### Django ###
 .env
+db.env
 *.log
 *.pot
 *.pyc
